@@ -2,51 +2,48 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BUNTEE – Bun Maska Food Stall</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BUNTEE – Premium Bun Maska</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
+        :root {
+            --bun-white: #FFFDF8;
+            --butter-gold: #FFD700;
+            --chocolate-deep: #4A2410;
+        }
         body {
             font-family: 'Quicksand', sans-serif;
-            background-color: #FFF8E7;
-            -webkit-tap-highlight-color: transparent;
+            background-color: var(--bun-white);
+            color: var(--chocolate-deep);
+            overflow-x: hidden;
         }
-        h1, h2, h3, .font-heading {
-            font-family: 'Nunito', sans-serif;
+        .font-premium { font-family: 'Playfair Display', serif; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
-        .bg-bun { background-color: #FFF8E7; }
-        .bg-butter { background-color: #FFD700; }
-        .text-chocolate { color: #8B4513; }
-        .bg-chocolate { background-color: #8B4513; }
-        .rounded-xlarge { border-radius: 2rem; }
-        
+        .btn-premium {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-premium:active { transform: scale(0.96); }
+
         @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(2deg); }
         }
-        .float-animation {
-            animation: float 3s ease-in-out infinite;
-        }
+        .floating { animation: float 6s ease-in-out infinite; }
 
-        /* Custom range slider styling */
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 24px;
-            width: 24px;
-            border-radius: 50%;
-            background: #8B4513;
-            cursor: pointer;
-            border: 3px solid white;
+        @keyframes pulse-soft {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
         }
-
-        .animate-spin-slow {
-            animation: spin 10s linear infinite;
-        }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        .pulse { animation: pulse-soft 2s infinite; }
+        
+        .scratch-container {
+            touch-action: none;
+            user-select: none;
         }
     </style>
 <script type="importmap">

@@ -110,7 +110,7 @@ service cloud.firestore {
             <h2 className="text-xl font-bold">2. Build Configuration</h2>
           </div>
           <div className="space-y-4 text-sm text-gray-600">
-             <p>Netlify settings (Site Configuration {' > '} Build {' & '} Deploy):</p>
+             <p>Netlify settings (Site Configuration {' &gt; '} Build {' &amp; '} Deploy):</p>
              <div className="bg-teal-50 p-4 rounded-2xl border border-teal-200">
                 <ul className="text-xs text-teal-600 space-y-2">
                   <li className="flex justify-between"><span>Build Command:</span> <b>npm run build</b></li>

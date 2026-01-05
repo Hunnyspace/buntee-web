@@ -1,7 +1,9 @@
+// Fix: Use standard named export from 'firebase/app' for initializeApp
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { GoogleGenAI } from '@google/genai';
+// Fix: Always use import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 // Firebase configuration using the provided environment variable.
 // The API_KEY is obtained exclusively from the environment variable process.env.API_KEY.
@@ -15,7 +17,6 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase using standard named export for modular SDK v9+.
-// Ensure initializeApp is imported from the correct entry point 'firebase/app'.
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);

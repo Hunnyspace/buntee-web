@@ -1,403 +1,442 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db, createAi } from '../services/firebase';
-import { doc, addDoc, collection, onSnapshot } from 'firebase/firestore';
-import { LucideInstagram, LucideCheckCircle, LucideHeart, LucidePartyPopper, LucideRocket, LucideShare2 } from 'lucide-react';
+import { doc, addDoc, collection, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { LucideInstagram, LucideCheckCircle, LucideHeart, LucidePartyPopper, LucideShare2, LucideMessageCircle, LucideArrowRight, LucideGift, LucideSend } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const LOGO_URL = "https://raw.githubusercontent.com/Hunnyspace/buntee-tracker/main/Bunteelogo.png";
 const INSTAGRAM_URL = "https://www.instagram.com/buntee.in/";
+const IG_DM_URL = "https://www.instagram.com/direct/t/buntee.in/";
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const [adminSettings, setAdminSettings] = useState<any>(null);
-  const [spinUnlocked, setSpinUnlocked] = useState(false);
-  const [hasSpun, setHasSpun] = useState(false);
-  const [spinResult, setSpinResult] = useState<string | null>(null);
+  const [bunWisdom, setBunWisdom] = useState<string>("The perfect bun is a warm hug for the soul...");
   const [rating, setRating] = useState(3);
   const [showSuccess, setShowSuccess] = useState<string | null>(null);
-  const [bunWisdom, setBunWisdom] = useState<string>("Baking happiness... 🍞");
 
-  // Load Admin Settings
+  // Scratch Card States
+  const [igHandle, setIgHandle] = useState("");
+  const [isGated, setIsGated] = useState(true);
+  const [isFollowed, setIsFollowed] = useState(false);
+  const [scratchRevealed, setScratchRevealed] = useState(false);
+  const [prize, setPrize] = useState<string | null>(null);
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
   useEffect(() => {
-    // Added error callback to onSnapshot to handle permission-denied gracefully
-    const unsub = onSnapshot(
-      doc(db, "adminSettings", "general"), 
-      (snapshot) => {
-        if (snapshot.exists()) setAdminSettings(snapshot.data());
-      },
-      (error) => {
-        console.warn("Firestore permissions: You might need to update your rules. Check the /guide page.", error);
-      }
-    );
+    const unsub = onSnapshot(doc(db, "adminSettings", "general"), (snap) => {
+      if (snap.exists()) setAdminSettings(snap.data());
+    });
     return () => unsub();
   }, []);
 
-  // Use Gemini to generate a fun bun-related pun or wisdom
   useEffect(() => {
-    const fetchBunWisdom = async () => {
+    const fetchWisdom = async () => {
       try {
         const ai = createAi();
-        const response = await ai.models.generateContent({
+        const res = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
-          contents: "Give a short, cozy, 1-sentence pun or 'bun wisdom' about bun maska and butter. Keep it cheerful.",
-          config: {
-            systemInstruction: "You are the Buntee Bun Assistant, a friendly bakery mascot. Your tone is warm and buttery.",
-          },
+          contents: "Give a short, elegant, 1-sentence 'bun wisdom' about bun maska. Use words like 'velvety', 'soulful', 'warmth'. Stay under 15 words.",
+          config: { systemInstruction: "You are a luxury food critic mascot for Buntee, a premium bun maska brand." },
         });
-        
-        const wisdomText = response.text;
-        if (wisdomText) {
-          setBunWisdom(wisdomText.trim());
-        }
-      } catch (error) {
-        console.error("Gemini failed to generate wisdom:", error);
+        setBunWisdom(res.text?.trim() || "The perfect bun is a warm hug for the soul.");
+      } catch (e) { console.error("Gemini Error:", e); }
+    };
+    fetchWisdom();
+  }, []);
+
+  // Initialize Scratch Card logic when un-gated
+  useEffect(() => {
+    if (!isGated && isFollowed && canvasRef.current && !scratchRevealed) {
+      initScratchCard();
+    }
+  }, [isGated, isFollowed, scratchRevealed]);
+
+  const initScratchCard = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set Prize from a pool of premium offers
+    const offers = ["Free Classic Bun", "Extra Maska", "Premium Drizzle", "20% Off Order", "BOGO Offer", "Surprise Cookie"];
+    const win = offers[Math.floor(Math.random() * offers.length)];
+    setPrize(win);
+
+    // Canvas sizing for retina displays
+    const size = 280;
+    canvas.width = size;
+    canvas.height = size;
+
+    // Draw the "Scratch" layer (Golden Butter)
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(0, 0, size, size);
+    
+    // Add pattern or texture to scratch layer
+    ctx.strokeStyle = '#E6C200';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < size; i += 20) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, size);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(size, i);
+      ctx.stroke();
+    }
+
+    // Scratch Prompt Text
+    ctx.fillStyle = '#4A2410';
+    ctx.font = 'bold 20px Quicksand';
+    ctx.textAlign = 'center';
+    ctx.fillText('SCRATCH TO REVEAL', size/2, size/2 + 7);
+
+    let isDrawing = false;
+
+    const scratch = (x: number, y: number) => {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.arc(x, y, 25, 0, Math.PI * 2);
+      ctx.fill();
+      checkReveal();
+    };
+
+    const checkReveal = () => {
+      const imageData = ctx.getImageData(0, 0, size, size);
+      let clearPixels = 0;
+      for (let i = 3; i < imageData.data.length; i += 4) {
+        if (imageData.data[i] === 0) clearPixels++;
+      }
+      const percent = (clearPixels / (size * size)) * 100;
+      if (percent > 45) {
+        setScratchRevealed(true);
       }
     };
-    fetchBunWisdom();
-  }, []);
 
-  // Check state from session/local storage
-  useEffect(() => {
-    const unlocked = sessionStorage.getItem('buntee_spin_unlocked');
-    if (unlocked) setSpinUnlocked(true);
-    const result = localStorage.getItem('buntee_spin_result');
-    if (result) {
-      setHasSpun(true);
-      setSpinResult(result);
-    }
-  }, []);
-
-  const handlePreBook = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    try {
-      await addDoc(collection(db, "preBookings"), {
-        name: formData.get('name'),
-        contact: formData.get('contact'),
-        message: formData.get('message'),
-        timestamp: new Date()
-      });
-      setShowSuccess("Thanks! We’ll reach out to you shortly ❤️");
-      e.currentTarget.reset();
-    } catch (err) {
-      alert("Submission failed. Please check your internet or Firebase permissions.");
-    }
-  };
-
-  const handleEventOrder = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const orderData: any = {
-      name: formData.get('name'),
-      contact: formData.get('contact'),
-      address: formData.get('address'),
-      date: formData.get('date'),
-      time: formData.get('time'),
-      type: formData.get('type'),
-      callSchedule: formData.get('callSchedule'),
-      timestamp: new Date(),
-      items: {}
+    const handleStart = (e: any) => { isDrawing = true; handleMove(e); };
+    const handleEnd = () => { isDrawing = false; };
+    const handleMove = (e: any) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      scratch(x, y);
     };
-    
-    const itemNames = ['Butter', 'Chocolate', 'Hazelnut', 'Caramel', 'Strawberry', 'Blueberry', 'Butterscotch', 'GreenApple', 'Orange', 'Water', 'Coconut'];
-    itemNames.forEach(item => {
-      const val = formData.get(`item_${item}`);
-      if (val && Number(val) > 0) orderData.items[item] = val;
-    });
 
-    try {
-      await addDoc(collection(db, "eventOrders"), orderData);
-      setShowSuccess("Our sales team will reach you out shortly 📞");
-      e.currentTarget.reset();
-    } catch (err) {
-      alert("Submission failed. Please check your internet or Firebase permissions.");
-    }
-  };
-
-  const unlockSpin = () => {
-    const message = encodeURIComponent("Hey Buntee 🍞 I’m at the stall, please unlock my spin!");
-    window.open(`${INSTAGRAM_URL}direct/t/buntee.in/?text=${message}`, '_blank');
-    setSpinUnlocked(true);
-    sessionStorage.setItem('buntee_spin_unlocked', 'true');
-  };
-
-  const handleSpin = () => {
-    if (hasSpun) return;
-    
-    const offers = [
-      { text: "₹1 Off", weight: 30 },
-      { text: "₹2 Off", weight: 25 },
-      { text: "₹5 Off", weight: 15 },
-      { text: "₹7 Off", weight: 10 },
-      { text: "Double Butter", weight: 10 },
-      { text: "Buy 3 Get 1", weight: 7 },
-      { text: "Free Bun", weight: 2 },
-      { text: "50% Off", weight: 1 }
-    ];
-
-    const pool: string[] = [];
-    offers.forEach(o => {
-      for (let i = 0; i < o.weight; i++) pool.push(o.text);
-    });
-
-    const result = pool[Math.floor(Math.random() * pool.length)];
-    setSpinResult(result);
-    setHasSpun(true);
-    localStorage.setItem('buntee_spin_result', result);
+    canvas.addEventListener('mousedown', handleStart);
+    canvas.addEventListener('touchstart', handleStart);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchend', handleEnd);
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('touchmove', handleMove);
   };
 
   const handleShare = async () => {
+    const shareText = `OMG! I just won a "${prize}" at BUNTEE! 🍞✨ Check out @buntee.in to get your daily maska fix!`;
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'I won a prize at Buntee! 🍞',
-          text: `I just won "${spinResult}" on the Buntee Bun Wheel! You should check them out.`,
+          title: 'I WON AT BUNTEE! 🍞',
+          text: shareText,
           url: window.location.origin,
         });
-      } catch (err) {
-        console.log("Share failed:", err);
-      }
+      } catch (e) { console.error(e); }
     } else {
-      alert("Copy this link to share Buntee: " + window.location.origin);
+      // Fallback: Copy to clipboard and alert
+      navigator.clipboard.writeText(shareText);
+      alert("Caption copied! Take a screenshot of your prize and tag @buntee.in in your Instagram Story!");
     }
   };
 
-  const getBearEmoji = () => {
-    if (rating <= 1) return "🐻‍❄️";
-    if (rating === 2) return "🐻";
-    if (rating === 3) return "🧸";
-    if (rating === 4) return "🐨";
-    return "🐼";
+  const unlockScratch = () => {
+    if (!igHandle || igHandle.trim().length < 3) {
+      alert("Please enter your Instagram handle to participate!");
+      return;
+    }
+    // Simulate/Prompt follow
+    window.open(INSTAGRAM_URL, '_blank');
+    setIsFollowed(true);
+    setIsGated(false);
   };
 
-  const getBearReaction = () => {
-    if (rating <= 1) return "Meh... need more butter!";
-    if (rating === 2) return "Getting better!";
-    if (rating === 3) return "Yum! That's Buntee!";
-    if (rating === 4) return "So soft! So delicious!";
-    return "BEST BUN EVER! ❤️";
+  const submitEvent = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      ...Object.fromEntries(formData),
+      timestamp: serverTimestamp(),
+    };
+    try {
+      await addDoc(collection(db, "eventOrders"), data);
+      setShowSuccess("Your bespoke event request has been received. Our concierge will contact you shortly.");
+      (e.target as HTMLFormElement).reset();
+    } catch (err) {
+      alert("Error submitting request. Please try again.");
+    }
+  };
+
+  const submitPreBook = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      ...Object.fromEntries(formData),
+      timestamp: serverTimestamp(),
+    };
+    try {
+      await addDoc(collection(db, "preBookings"), data);
+      setShowSuccess("Pre-booked! We'll have your buns ready.");
+      (e.target as HTMLFormElement).reset();
+    } catch (err) {
+      alert("Error pre-booking.");
+    }
   };
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-bun pb-20 overflow-x-hidden">
-      {/* Hero Section */}
-      <section className="pt-10 px-6 text-center">
-        <img src={LOGO_URL} alt="Buntee Logo" className="w-48 mx-auto mb-6 float-animation" />
-        <h1 className="text-3xl font-extrabold text-chocolate mb-2">Authentic Bun Maska</h1>
-        <p className="text-gray-600 mb-6 italic">Soft Buns. Melted Butter. Pure Love. ❤️</p>
+    <div className="min-h-screen bg-[#FFFDF8] pb-24 selection:bg-butter-gold selection:text-chocolate-deep">
+      {/* Immersive Floating Instagram Chat FAB */}
+      <a 
+        href={IG_DM_URL} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="fixed bottom-8 right-8 z-[60] bg-[#4A2410] text-white p-5 rounded-full shadow-2xl pulse flex items-center justify-center hover:scale-110 transition-transform active:scale-95"
+        title="Chat with us on Instagram"
+      >
+        <LucideMessageCircle size={28} />
+      </a>
+
+      {/* Hero Header */}
+      <header className="pt-16 px-8 text-center relative overflow-hidden">
+        {/* Soft background glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-butter-gold/10 blur-[120px] -z-10 rounded-full"></div>
         
-        {/* Gemini-Powered Bun Wisdom */}
-        <div className="bg-white/40 backdrop-blur-md p-4 rounded-2xl mb-8 border border-white/60 text-chocolate italic text-sm">
-          "{bunWisdom}"
-        </div>
-        
-        <div className="flex flex-col gap-4">
-          <button onClick={() => document.getElementById('wheel')?.scrollIntoView({behavior: 'smooth'})} className="bg-butter text-chocolate font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-            Spin the Bun Wheel 🍞
-          </button>
-          <button onClick={() => document.getElementById('prebook')?.scrollIntoView({behavior: 'smooth'})} className="bg-chocolate text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-            Pre-Book Special Buns ❤️
-          </button>
-          <button onClick={() => document.getElementById('events')?.scrollIntoView({behavior: 'smooth'})} className="bg-white border-2 border-chocolate text-chocolate font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-            Events & Parties 🎉
-          </button>
-        </div>
-      </section>
-
-      {/* Today's Flavours */}
-      <section className="mt-16 px-6">
-        <h2 className="text-2xl font-bold text-chocolate mb-6 text-center">Today's Flavours</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white p-4 rounded-3xl shadow-md border-b-4 border-butter">
-            <div className="text-4xl mb-2 text-center">🧈</div>
-            <h3 className="font-bold text-chocolate text-center">Authentic Butter</h3>
+        <div className="relative z-10">
+          <img src={LOGO_URL} alt="Buntee" className="w-36 mx-auto mb-10 floating drop-shadow-[0_20px_50px_rgba(74,36,16,0.15)]" />
+          <h1 className="text-5xl md:text-6xl font-premium font-black text-[#4A2410] mb-4 leading-tight">
+            Elevating <br /><span className="italic text-orange-400">The Maska.</span>
+          </h1>
+          <p className="max-w-xs mx-auto text-gray-400 font-medium leading-relaxed mb-10 text-sm tracking-wide">
+            A boutique Bun Maska experience, blending tradition with modern luxury.
+          </p>
+          
+          <div className="bg-white/40 backdrop-blur-xl border border-white/60 p-6 rounded-[2rem] mb-12 italic text-[#4A2410]/80 shadow-sm max-w-sm mx-auto font-medium">
+             "{bunWisdom}"
           </div>
-          <div className="bg-white p-4 rounded-3xl shadow-md border-b-4 border-chocolate">
-            <div className="text-4xl mb-2 text-center">🍫</div>
-            <h3 className="font-bold text-chocolate text-center">Chocolate</h3>
-          </div>
-        </div>
-      </section>
 
-      {/* Mystery Section */}
-      <section className="mt-16 px-6">
-        <div className="relative bg-white rounded-3xl p-8 text-center overflow-hidden border-2 border-dashed border-chocolate">
-           <div className="absolute inset-0 bg-white/60 backdrop-blur-md flex flex-col items-center justify-center z-10">
-              <div className="text-4xl mb-2">🧁</div>
-              <p className="text-chocolate font-bold">{adminSettings?.teaserText || "Something special is baking… ❤️ Valentine Edition"}</p>
-           </div>
-           <div className="opacity-20 flex gap-4 justify-center">
-              <div className="w-16 h-16 bg-pink-200 rounded-full"></div>
-              <div className="w-16 h-16 bg-red-200 rounded-full"></div>
-              <div className="w-16 h-16 bg-pink-300 rounded-full"></div>
-           </div>
-        </div>
-      </section>
-
-      {/* Spin Wheel */}
-      <section id="wheel" className="mt-16 px-6">
-        <div className="bg-white rounded-3xl p-8 shadow-xl border-4 border-butter relative overflow-hidden">
-          <h2 className="text-2xl font-bold text-chocolate mb-4 text-center">Spin the Bun Wheel!</h2>
-          {!spinUnlocked ? (
-            <div className="text-center py-6">
-              <p className="text-gray-600 mb-6">Unlock your lucky offer by sending us a DM on Instagram! 🎁</p>
-              <button onClick={unlockSpin} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 px-6 rounded-full flex items-center justify-center gap-2 mx-auto">
-                <LucideInstagram size={20} /> Unlock Spin Wheel
-              </button>
+          <div className="flex flex-col gap-4 max-w-sm mx-auto">
+            <button 
+              onClick={() => document.getElementById('rewards')?.scrollIntoView({behavior: 'smooth'})}
+              className="bg-[#4A2410] text-white py-5 px-8 rounded-3xl font-bold shadow-2xl btn-premium flex items-center justify-center gap-3 group"
+            >
+              <LucideGift size={20} className="text-butter-gold group-hover:rotate-12 transition-transform" /> 
+              Claim Reward
+            </button>
+            <div className="flex gap-4">
+               <button onClick={() => document.getElementById('events')?.scrollIntoView({behavior: 'smooth'})} className="flex-1 bg-white border-2 border-[#4A2410] text-[#4A2410] py-4 rounded-3xl font-bold btn-premium">Events</button>
+               <button onClick={() => document.getElementById('prebook')?.scrollIntoView({behavior: 'smooth'})} className="flex-1 bg-butter-gold text-[#4A2410] py-4 rounded-3xl font-bold btn-premium shadow-lg">Pre-Book</button>
             </div>
-          ) : (
-            <div className="text-center">
-              {hasSpun ? (
-                <div className="py-8 animate-in fade-in zoom-in duration-500">
-                  <div className="text-chocolate text-xl font-bold mb-4">CONGRATULATIONS! 🎉</div>
-                  <div className="bg-butter/20 p-6 rounded-2xl border-2 border-butter inline-block mb-4">
-                    <div className="text-3xl font-extrabold text-chocolate">{spinResult}</div>
-                  </div>
-                  <p className="text-gray-600 text-sm">Show this screen at the Buntee counter to claim your reward!</p>
-                  
-                  <div className="mt-6 flex flex-col gap-3">
+          </div>
+        </div>
+      </header>
+
+      {/* Boutique Menu Peek */}
+      <section className="mt-32 px-8">
+        <div className="flex items-center justify-between mb-10">
+          <h2 className="text-3xl font-premium font-bold">The Collection</h2>
+          <div className="h-[1px] flex-1 bg-[#4A2410]/10 ml-8"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="glass-card p-8 rounded-[3rem] flex items-center gap-8 shadow-sm group hover:shadow-2xl transition-all border-none">
+             <div className="w-24 h-24 bg-orange-100/50 rounded-[2rem] flex items-center justify-center text-5xl group-hover:scale-110 transition-transform">🧈</div>
+             <div>
+                <h3 className="text-2xl font-bold mb-1">Classic Gold</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">Artisan bun, whipped salted butter, and a hint of nostalgia.</p>
+             </div>
+          </div>
+          <div className="glass-card p-8 rounded-[3rem] flex items-center gap-8 shadow-sm group hover:shadow-2xl transition-all border-none">
+             <div className="w-24 h-24 bg-brown-100/50 rounded-[2rem] flex items-center justify-center text-5xl group-hover:scale-110 transition-transform">☕</div>
+             <div>
+                <h3 className="text-2xl font-bold mb-1">Kadak Irani</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">Strong, milky, and brewed to perfection for your dip.</p>
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Gated Scratch Card Section */}
+      <section id="rewards" className="mt-32 px-6">
+        <div className="bg-[#4A2410] rounded-[4rem] p-12 text-center shadow-[0_40px_100px_rgba(74,36,16,0.3)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-20 translate-x-20"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-butter-gold/10 rounded-full translate-y-16 -translate-x-16"></div>
+          
+          <div className="relative z-10">
+            <h2 className="text-4xl font-premium text-white mb-3">The Golden Scratch</h2>
+            <p className="text-white/50 text-sm mb-12 tracking-wider uppercase font-bold">Exclusive Digital Reward</p>
+
+            {isGated ? (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 max-w-sm mx-auto">
+                 <div className="relative group">
+                    <input 
+                      value={igHandle}
+                      onChange={(e) => setIgHandle(e.target.value)}
+                      placeholder="@your_instagram"
+                      className="w-full bg-white/5 border border-white/10 rounded-3xl py-6 px-8 text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-butter-gold transition-all text-lg font-medium"
+                    />
+                    <LucideInstagram className="absolute right-8 top-6 text-white/20 group-focus-within:text-butter-gold transition-colors" size={24} />
+                 </div>
+                 <div className="space-y-4">
+                  <button 
+                    onClick={unlockScratch}
+                    className="w-full bg-butter-gold text-[#4A2410] py-6 rounded-3xl font-black shadow-xl flex items-center justify-center gap-3 btn-premium text-lg"
+                  >
+                    Follow @buntee.in to Scratch
+                  </button>
+                  <p className="text-[10px] text-white/30 uppercase tracking-[0.3em] font-bold">Follow required to validate reward</p>
+                 </div>
+              </div>
+            ) : (
+              <div className="relative mx-auto w-full max-w-[300px] aspect-square rounded-[3rem] overflow-hidden bg-white shadow-2xl flex items-center justify-center animate-in zoom-in duration-500">
+                 {/* Under Layer (The Prize) */}
+                 <div className="absolute inset-0 flex flex-col items-center justify-center p-10 text-[#4A2410] bg-[#FFFDF8]">
+                    <div className="w-16 h-16 bg-butter-gold/20 rounded-full flex items-center justify-center mb-4">
+                      <LucidePartyPopper className="text-butter-gold" size={32} />
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400 mb-2">Congratulations</p>
+                    <p className="text-4xl font-premium font-black mb-8 leading-tight">{prize}</p>
                     <button 
                       onClick={handleShare}
-                      className="bg-butter text-chocolate font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 shadow-md w-full"
+                      className={`bg-[#4A2410] text-white px-8 py-4 rounded-full text-sm font-bold flex items-center gap-3 transition-all duration-1000 transform ${scratchRevealed ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-90 pointer-events-none'}`}
                     >
-                      <LucideShare2 size={18} /> Share My Prize
+                      <LucideInstagram size={18} /> Share to Story
                     </button>
-                    <div className="text-[10px] text-gray-400">Coupon: BNT-{Math.floor(Math.random()*90000)+10000}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-8">
-                   <div className="relative w-48 h-48 mx-auto mb-8 flex items-center justify-center">
-                      <div className="absolute w-full h-full rounded-full border-8 border-butter flex items-center justify-center">
-                        <div className="text-6xl animate-spin-slow">🍞</div>
-                      </div>
-                      <button onClick={handleSpin} className="relative z-20 bg-chocolate text-white w-20 h-20 rounded-full flex items-center justify-center font-black shadow-xl border-4 border-white active:scale-90 transition-transform">SPIN!</button>
-                   </div>
-                   <p className="text-chocolate font-medium italic">What will you win today?</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
+                 </div>
 
-      {/* Pre-book Form */}
-      <section id="prebook" className="mt-16 px-6">
-        <div className="bg-chocolate text-white rounded-3xl p-8 shadow-xl">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <LucideHeart fill="white" /> Pre-Book Special Buns
-          </h2>
-          <form onSubmit={handlePreBook} className="flex flex-col gap-4">
-            <input name="name" type="text" placeholder="Your Name" required className="bg-white/10 border border-white/20 rounded-xl p-4 placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-butter" />
-            <input name="contact" type="tel" placeholder="Contact Number" required className="bg-white/10 border border-white/20 rounded-xl p-4 placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-butter" />
-            <textarea name="message" placeholder="Which buns do you want? (Thoughts / Message)" rows={3} className="bg-white/10 border border-white/20 rounded-xl p-4 placeholder-white/50 text-white focus:outline-none focus:ring-2 focus:ring-butter"></textarea>
-            <button type="submit" className="bg-butter text-chocolate font-bold py-4 rounded-xl shadow-lg mt-2 active:scale-95 transition-transform">
-              Send Love 🍞
-            </button>
-          </form>
-        </div>
-      </section>
-
-      {/* Events Form */}
-      <section id="events" className="mt-16 px-6">
-        <div className="bg-white rounded-3xl p-8 shadow-xl border-4 border-chocolate">
-          <h2 className="text-2xl font-bold text-chocolate mb-6 flex items-center gap-2">
-            <LucidePartyPopper /> Events & Parties
-          </h2>
-          <form onSubmit={handleEventOrder} className="flex flex-col gap-5 text-chocolate">
-             <div className="grid grid-cols-1 gap-4">
-               <input name="name" type="text" placeholder="Full Name" required className="border-2 border-chocolate/10 bg-bun/30 rounded-xl p-4 focus:border-chocolate focus:outline-none" />
-               <input name="contact" type="tel" placeholder="Contact Number" required className="border-2 border-chocolate/10 bg-bun/30 rounded-xl p-4 focus:border-chocolate focus:outline-none" />
-               <input name="address" type="text" placeholder="Event Address" required className="border-2 border-chocolate/10 bg-bun/30 rounded-xl p-4 focus:border-chocolate focus:outline-none" />
-               <div className="grid grid-cols-2 gap-2">
-                  <input name="date" type="date" required className="border-2 border-chocolate/10 bg-bun/30 rounded-xl p-4 focus:border-chocolate focus:outline-none" />
-                  <input name="time" type="time" required className="border-2 border-chocolate/10 bg-bun/30 rounded-xl p-4 focus:border-chocolate focus:outline-none" />
-               </div>
-               <select name="type" required className="border-2 border-chocolate/10 bg-bun/30 rounded-xl p-4 focus:border-chocolate focus:outline-none">
-                 <option value="">Select Event Type</option>
-                 <option value="Birthday">Birthday</option>
-                 <option value="Office Party">Office Party</option>
-                 <option value="College Event">College Event</option>
-                 <option value="Wedding">Wedding</option>
-                 <option value="House Party">House Party</option>
-                 <option value="Other">Other</option>
-               </select>
-             </div>
-
-             <div className="space-y-4">
-                <p className="font-bold underline">Items (Quantity):</p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                   {['Butter', 'Chocolate', 'Hazelnut', 'Caramel', 'Strawberry', 'Blueberry', 'Butterscotch', 'GreenApple', 'Orange'].map(item => (
-                     <div key={item} className="flex items-center justify-between">
-                        <span>{item} Bun</span>
-                        <input name={`item_${item}`} type="number" placeholder="0" className="w-16 border-b border-chocolate/30 p-1 text-center bg-transparent focus:outline-none" />
-                     </div>
-                   ))}
-                </div>
-                <div className="mt-4 p-3 bg-butter/20 rounded-xl text-xs italic">
-                  * Special flavours are prepared only on order basis.
-                </div>
-             </div>
-
-             <div className="flex flex-col gap-2">
-               <label className="text-xs font-bold">Preferred Call Schedule</label>
-               <input name="callSchedule" type="datetime-local" className="border-2 border-chocolate/10 bg-bun/30 rounded-xl p-4 focus:border-chocolate focus:outline-none" />
-             </div>
-
-             <button type="submit" className="bg-chocolate text-white font-bold py-4 rounded-xl shadow-lg mt-4 flex items-center justify-center gap-2 active:scale-95 transition-transform">
-               Request Quote 🎉
-             </button>
-          </form>
-        </div>
-      </section>
-
-      {/* Rating Bar */}
-      <section className="mt-16 px-6">
-        <div className="bg-butter rounded-3xl p-8 shadow-xl text-center">
-          <h2 className="text-2xl font-bold text-chocolate mb-6">How was your Bun?</h2>
-          <div className="text-6xl mb-4 transition-all duration-500 scale-125">
-            {getBearEmoji()}
+                 {/* Scratch Layer Canvas */}
+                 {!scratchRevealed && (
+                   <canvas 
+                     ref={canvasRef} 
+                     className="absolute inset-0 cursor-crosshair z-10 touch-none shadow-inner"
+                   />
+                 )}
+              </div>
+            )}
           </div>
-          <p className="text-chocolate font-bold h-6 mb-8">{getBearReaction()}</p>
+        </div>
+      </section>
+
+      {/* Pre-Booking - Subtle Premium Form */}
+      <section id="prebook" className="mt-32 px-8 max-w-2xl mx-auto">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-premium font-bold mb-4">Reserve Your Bun</h2>
+          <p className="text-gray-400 font-medium">Baking fresh, just for you. Skip the wait.</p>
+        </div>
+        <form onSubmit={submitPreBook} className="space-y-5">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+             <input name="name" placeholder="Name" className="bg-white border-2 border-[#4A2410]/5 rounded-3xl p-6 outline-none focus:border-butter-gold transition-colors font-medium" required />
+             <input name="contact" placeholder="Contact Number" className="bg-white border-2 border-[#4A2410]/5 rounded-3xl p-6 outline-none focus:border-butter-gold transition-colors font-medium" required />
+           </div>
+           <textarea name="message" placeholder="What can we bake for you today? (Items & Qty)" className="w-full bg-white border-2 border-[#4A2410]/5 rounded-[2rem] p-6 min-h-[120px] outline-none focus:border-butter-gold transition-colors font-medium" required></textarea>
+           <button className="w-full bg-[#4A2410] text-white py-6 rounded-3xl font-bold shadow-xl flex items-center justify-center gap-3 hover:bg-black transition-colors">
+              Confirm Reservation <LucideCheckCircle size={20} className="text-butter-gold" />
+           </button>
+        </form>
+      </section>
+
+      {/* Events - Elevated Request Form */}
+      <section id="events" className="mt-32 px-8">
+        <div className="bg-[#FFF4E0] rounded-[4rem] p-12 md:p-20 relative overflow-hidden">
+           <div className="absolute top-0 right-0 p-10 opacity-10">
+              <LucideHeart size={200} className="text-[#4A2410]" />
+           </div>
+           <div className="max-w-xl relative z-10">
+              <h2 className="text-4xl md:text-5xl font-premium font-bold mb-6 text-[#4A2410]">The Buntee Cart <br />At Your Event.</h2>
+              <p className="text-[#4A2410]/60 mb-12 font-medium leading-relaxed">
+                Add a touch of artisanal warmth to your weddings, corporate meets, or private soirees. Our cart brings the charm.
+              </p>
+              
+              <form onSubmit={submitEvent} className="space-y-4">
+                 <input name="name" placeholder="Event Host Name" className="w-full bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white focus:bg-white outline-none transition-all" required />
+                 <input name="contact" placeholder="Preferred Contact" className="w-full bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white focus:bg-white outline-none transition-all" required />
+                 <div className="grid grid-cols-2 gap-4">
+                    <input name="date" type="date" className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white outline-none" required />
+                    <select name="type" className="bg-white/50 backdrop-blur-md rounded-2xl p-5 border border-white outline-none" required>
+                       <option>Wedding</option>
+                       <option>Corporate</option>
+                       <option>Private Party</option>
+                       <option>Other</option>
+                    </select>
+                 </div>
+                 <button className="w-full bg-[#4A2410] text-white py-6 rounded-3xl font-black shadow-2xl flex items-center justify-center gap-3 btn-premium">
+                    Inquire Now <LucideSend size={20} />
+                 </button>
+              </form>
+           </div>
+        </div>
+      </section>
+
+      {/* Premium Ratings Experience */}
+      <section className="mt-32 px-8 text-center">
+        <div className="max-w-sm mx-auto glass-card p-12 rounded-[4rem] border-none shadow-xl">
+          <h2 className="text-2xl font-premium font-bold mb-10">How's the Maska?</h2>
+          <div className="text-8xl mb-10 transition-all duration-700 transform hover:scale-125">
+            {rating <= 1 ? "🐻‍❄️" : rating === 2 ? "🐻" : rating === 3 ? "🧸" : rating === 4 ? "🐨" : "🐼"}
+          </div>
           <input 
-            type="range" min="1" max="5" step="1" 
+            type="range" min="1" max="5" 
             value={rating} 
-            onChange={(e) => setRating(parseInt(e.target.value))}
-            className="w-full h-4 bg-chocolate/20 rounded-lg appearance-none cursor-pointer accent-chocolate"
+            onChange={(e) => setRating(Number(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer accent-[#4A2410] mb-8"
           />
-          <div className="flex justify-between mt-2 text-chocolate font-black text-xs">
-            <span>OKAY</span>
-            <span>GOOD</span>
-            <span>AMAZING</span>
-          </div>
+          <p className="font-black text-[#4A2410] tracking-widest text-xs uppercase">
+             {rating === 5 ? "ABSOLUTE PERFECTION! ✨" : rating >= 4 ? "So Soft & Creamy!" : "Baking it better!"}
+          </p>
         </div>
       </section>
 
-      {/* Deployment Hub Shortcut */}
-      <section className="mt-12 px-6">
-        <button 
-          onClick={() => navigate('/guide')}
-          className="w-full bg-white/50 border-2 border-dashed border-chocolate/20 p-6 rounded-3xl flex flex-col items-center gap-2 hover:bg-butter/10 transition-colors"
-        >
-          <LucideRocket className="text-chocolate opacity-40" />
-          <span className="text-xs font-bold text-chocolate opacity-40 uppercase tracking-widest">Open Deployment Hub</span>
-        </button>
-      </section>
+      {/* Boutique Footer */}
+      <footer className="mt-40 pt-24 pb-16 px-8 bg-[#4A2410] text-center text-white relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-butter-gold/30 to-transparent"></div>
+        <img src={LOGO_URL} alt="Buntee" className="w-24 mx-auto opacity-40 mb-10 grayscale brightness-200" />
+        
+        <div className="flex justify-center gap-12 mb-16">
+           <a href={INSTAGRAM_URL} className="text-white/40 hover:text-butter-gold transition-colors flex flex-col items-center gap-2">
+             <LucideInstagram size={28} />
+             <span className="text-[10px] font-bold tracking-widest">FOLLOW</span>
+           </a>
+           <a href={IG_DM_URL} className="text-white/40 hover:text-butter-gold transition-colors flex flex-col items-center gap-2">
+             <LucideMessageCircle size={28} />
+             <span className="text-[10px] font-bold tracking-widest">DM US</span>
+           </a>
+        </div>
 
-      {/* Footer */}
-      <footer className="mt-10 px-6 py-10 bg-chocolate text-white/50 text-center">
-         <img src={LOGO_URL} alt="Logo" className="w-16 mx-auto opacity-50 grayscale mb-4" />
-         <p className="text-xs">© 2024 BUNTEE Web. All rights reserved.</p>
-         <p className="text-[10px] mt-2">Baking happiness, one bun at a time.</p>
+        <p className="text-white/20 text-[10px] uppercase tracking-[0.5em] font-medium mb-4">Buntee Bun Maska • Boutique Bakehouse</p>
+        <p className="text-white/10 text-[9px] uppercase tracking-[0.3em]">© 2024 All Rights Reserved</p>
+        
+        <button 
+          onClick={() => navigate('/admin')}
+          className="mt-12 text-white/5 hover:text-white/20 text-[10px] tracking-widest uppercase transition-colors"
+        >
+          Staff Portal
+        </button>
       </footer>
 
       {/* Success Modal */}
       {showSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl scale-110">
-            <div className="text-green-500 mb-4 flex justify-center"><LucideCheckCircle size={48} /></div>
-            <p className="text-chocolate font-bold text-lg mb-6">{showSuccess}</p>
-            <button onClick={() => setShowSuccess(null)} className="bg-chocolate text-white font-bold py-3 px-8 rounded-full w-full">Great!</button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#4A2410]/95 backdrop-blur-2xl animate-in fade-in duration-500">
+          <div className="bg-white rounded-[4rem] p-12 max-w-sm w-full text-center shadow-[0_50px_100px_rgba(0,0,0,0.4)] animate-in zoom-in slide-in-from-bottom-10 duration-700">
+            <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8">
+              <LucideCheckCircle size={50} className="text-green-500" />
+            </div>
+            <h3 className="text-3xl font-premium font-bold mb-4">Done & Dusted.</h3>
+            <p className="text-gray-400 font-medium leading-relaxed mb-10">{showSuccess}</p>
+            <button 
+              onClick={() => setShowSuccess(null)} 
+              className="w-full bg-[#4A2410] text-white py-5 rounded-3xl font-black tracking-widest text-sm shadow-xl"
+            >
+              EXCELLENT
+            </button>
           </div>
         </div>
       )}
