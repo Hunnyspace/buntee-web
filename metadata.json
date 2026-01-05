@@ -1,0 +1,8 @@
+
+{
+  "name": "BUNTEE Web",
+  "description": "An immersive, mobile-first website for Buntee Bun Maska food stall featuring a spin wheel, pre-booking, and event ordering.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
