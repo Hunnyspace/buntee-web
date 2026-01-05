@@ -1,9 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
-import { db } from '../services/firebase';
+import { db, createAi } from '../services/firebase';
 import { doc, addDoc, collection, onSnapshot } from 'firebase/firestore';
 import { LucideInstagram, LucideCheckCircle, LucideHeart, LucidePartyPopper, LucideRocket, LucideShare2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleGenAI } from "@google/genai";
 
 const LOGO_URL = "https://raw.githubusercontent.com/Hunnyspace/buntee-tracker/main/Bunteelogo.png";
 const INSTAGRAM_URL = "https://www.instagram.com/buntee.in/";
@@ -31,7 +31,8 @@ const Home: React.FC = () => {
     const fetchBunWisdom = async () => {
       try {
         // Create a new instance right before the call to ensure the latest API key is used
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        // Using the factory function from our firebase service
+        const ai = createAi();
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: "Give a short, cozy, 1-sentence pun or 'bun wisdom' about bun maska and butter. Keep it cheerful.",
@@ -40,9 +41,11 @@ const Home: React.FC = () => {
           },
         });
         
-        // Directly accessing the .text property from GenerateContentResponse
-        if (response.text) {
-          setBunWisdom(response.text.trim());
+        // Directly accessing the .text property from GenerateContentResponse as per guidelines
+        // The .text property is a getter, do not call it as a method.
+        const wisdomText = response.text;
+        if (wisdomText) {
+          setBunWisdom(wisdomText.trim());
         }
       } catch (error) {
         console.error("Gemini failed to generate wisdom:", error);
@@ -191,7 +194,7 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Current Flavours */}
+      {/* Today's Flavours */}
       <section className="mt-16 px-6">
         <h2 className="text-2xl font-bold text-chocolate mb-6 text-center">Today's Flavours</h2>
         <div className="grid grid-cols-2 gap-4">
