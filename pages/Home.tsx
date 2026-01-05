@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
 import { doc, addDoc, collection, onSnapshot } from 'firebase/firestore';
@@ -32,8 +31,8 @@ const Home: React.FC = () => {
     const fetchBunWisdom = async () => {
       try {
         // Create a new instance right before the call to ensure the latest API key is used
-        const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const response = await genAI.models.generateContent({
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: "Give a short, cozy, 1-sentence pun or 'bun wisdom' about bun maska and butter. Keep it cheerful.",
           config: {

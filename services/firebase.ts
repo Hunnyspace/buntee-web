@@ -1,4 +1,3 @@
-
 // Use standard modular imports for Firebase v9+
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
@@ -21,7 +20,6 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 
-// Initialize Gemini AI client
-// Note: While we export it here for convenience, 
-// guidelines recommend fresh instances for specific use cases.
-export const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Use a factory function for Gemini AI client to ensure fresh instances are created
+// as recommended by the guidelines to use the most up-to-date API key.
+export const createAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
