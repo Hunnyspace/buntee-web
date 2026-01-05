@@ -1,12 +1,11 @@
-
 // Use standard modular imports for Firebase v9+
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import {GoogleGenAI} from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
-// Firebase configuration using the provided environment variable
-// The API_KEY is injected automatically and must be used directly.
+// Firebase configuration using the provided environment variable.
+// The API_KEY is obtained exclusively from the environment variable process.env.API_KEY.
 const firebaseConfig = {
   apiKey: process.env.API_KEY,
   authDomain: "buntee-web.firebaseapp.com",
@@ -16,7 +15,7 @@ const firebaseConfig = {
   appId: "1:123456789:web:abcdef123456"
 };
 
-// Initialize Firebase
+// Fix: Initialize Firebase using standard named export for modular SDK v9+.
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);

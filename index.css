@@ -1,0 +1,22 @@
+/* Base styles to prevent layout shift */
+#root {
+  min-height: 100vh;
+}
+
+/* Custom scrollbar for a buttery feel */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FFF8E7;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #8B4513;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6D3610;
+}
