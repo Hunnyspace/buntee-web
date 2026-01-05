@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
-import { db, ai } from '../services/firebase';
+import { db } from '../services/firebase';
 import { doc, addDoc, collection, onSnapshot } from 'firebase/firestore';
 import { LucideInstagram, LucideCheckCircle, LucideHeart, LucidePartyPopper, LucideRocket, LucideShare2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { GoogleGenAI } from "@google/genai";
 
 const LOGO_URL = "https://raw.githubusercontent.com/Hunnyspace/buntee-tracker/main/Bunteelogo.png";
 const INSTAGRAM_URL = "https://www.instagram.com/buntee.in/";
@@ -29,13 +31,17 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchBunWisdom = async () => {
       try {
-        const response = await ai.models.generateContent({
+        // Create a new instance right before the call to ensure the latest API key is used
+        const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await genAI.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: "Give a short, cozy, 1-sentence pun or 'bun wisdom' about bun maska and butter. Keep it cheerful.",
           config: {
             systemInstruction: "You are the Buntee Bun Assistant, a friendly bakery mascot. Your tone is warm and buttery.",
           },
         });
+        
+        // Directly accessing the .text property from GenerateContentResponse
         if (response.text) {
           setBunWisdom(response.text.trim());
         }
