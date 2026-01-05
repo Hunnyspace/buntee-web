@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../services/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { LucideLogOut, LucideSettings, LucideClipboardList, LucideSave, LucideTruck, LucideAlertTriangle } from 'lucide-react';
+import { doc, getDoc, setDoc, collection, query, orderBy, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
+import { LucideLogOut, LucideSettings, LucideClipboardList, LucideSave, LucideTruck, LucideAlertTriangle, LucidePlus, LucideTrash2, LucideUtensils } from 'lucide-react';
 
 interface AdminProps {
   user: any;
@@ -14,80 +14,66 @@ const Admin: React.FC<AdminProps> = ({ user }) => {
   const [error, setError] = useState("");
   const [permissionError, setPermissionError] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'settings' | 'prebookings' | 'events'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'menu' | 'prebookings' | 'events'>('settings');
   const [settings, setSettings] = useState<any>({ teaserText: "" });
+  const [menuItems, setMenuItems] = useState<any[]>([]);
   const [preBookings, setPreBookings] = useState<any[]>([]);
   const [eventOrders, setEventOrders] = useState<any[]>([]);
+
+  // New Menu Item Form
+  const [newItem, setNewItem] = useState({ name: "", price: "", emoji: "🍞" });
 
   useEffect(() => {
     if (!user) return;
 
     // Load settings
-    const loadSettings = async () => {
-      try {
-        const docRef = doc(db, "adminSettings", "general");
-        const d = await getDoc(docRef);
-        if (d.exists()) setSettings(d.data());
-      } catch (err) {
-        console.error("Settings load error:", err);
-        setPermissionError(true);
-      }
-    };
-    loadSettings();
+    getDoc(doc(db, "adminSettings", "general")).then(d => d.exists() && setSettings(d.data()));
 
-    // Listen to data with error handlers
-    const qPre = query(collection(db, "preBookings"), orderBy("timestamp", "desc"));
-    const unsubPre = onSnapshot(qPre, 
+    // Listen to Menu
+    const unsubMenu = onSnapshot(collection(db, "menuItems"), (snap) => {
+      setMenuItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => setPermissionError(true));
+
+    // Listen to data
+    const unsubPre = onSnapshot(query(collection(db, "preBookings"), orderBy("timestamp", "desc")), 
       (snap) => setPreBookings(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      (err) => {
-        console.error("PreBookings listener error:", err);
-        setPermissionError(true);
-      }
+      () => setPermissionError(true)
     );
 
-    const qEvent = query(collection(db, "eventOrders"), orderBy("timestamp", "desc"));
-    const unsubEvent = onSnapshot(qEvent, 
+    const unsubEvent = onSnapshot(query(collection(db, "eventOrders"), orderBy("timestamp", "desc")), 
       (snap) => setEventOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      (err) => {
-        console.error("EventOrders listener error:", err);
-        setPermissionError(true);
-      }
+      () => setPermissionError(true)
     );
 
-    return () => {
-      unsubPre();
-      unsubEvent();
-    };
+    return () => { unsubMenu(); unsubPre(); unsubEvent(); };
   }, [user]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err: any) {
-      setError(err.message);
-    }
+    try { await signInWithEmailAndPassword(auth, email, password); } catch (err: any) { setError(err.message); }
   };
 
-  const handleSaveSettings = async () => {
-    try {
-      await setDoc(doc(db, "adminSettings", "general"), settings);
-      alert("Settings saved!");
-    } catch (err) {
-      alert("Failed to save. Check your Firebase Rules.");
-    }
+  const handleAddMenuItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItem.name || !newItem.price) return;
+    await addDoc(collection(db, "menuItems"), { ...newItem, price: Number(newItem.price) });
+    setNewItem({ name: "", price: "", emoji: "🍞" });
+  };
+
+  const handleDeleteMenu = async (id: string) => {
+    if (window.confirm("Delete this flavor?")) await deleteDoc(doc(db, "menuItems", id));
   };
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-bun flex items-center justify-center p-6">
-        <form onSubmit={handleLogin} className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm border-2 border-chocolate">
-          <h1 className="text-2xl font-bold text-chocolate mb-6 text-center">Admin Login</h1>
-          {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+      <div className="min-h-screen bg-[#FFFDF8] flex items-center justify-center p-6">
+        <form onSubmit={handleLogin} className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-sm border-2 border-[#4A2410]">
+          <h1 className="text-3xl font-premium font-bold text-[#4A2410] mb-8 text-center">Buntee Admin</h1>
+          {error && <p className="text-red-500 text-xs mb-6 bg-red-50 p-3 rounded-xl">{error}</p>}
           <div className="flex flex-col gap-4">
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="p-4 border rounded-xl focus:outline-none focus:ring-2 focus:ring-chocolate" required />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="p-4 border rounded-xl focus:outline-none focus:ring-2 focus:ring-chocolate" required />
-            <button type="submit" className="bg-chocolate text-white font-bold py-4 rounded-xl shadow-lg mt-2">Login</button>
+            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="p-5 border rounded-2xl outline-none focus:ring-2 focus:ring-butter-gold" required />
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="p-5 border rounded-2xl outline-none focus:ring-2 focus:ring-butter-gold" required />
+            <button type="submit" className="bg-[#4A2410] text-white font-bold py-5 rounded-2xl shadow-lg mt-4">Login</button>
           </div>
         </form>
       </div>
@@ -95,115 +81,98 @@ const Admin: React.FC<AdminProps> = ({ user }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
       <header className="bg-white border-b p-6 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-           <div className="w-10 h-10 bg-butter rounded-full flex items-center justify-center text-xl">🐻</div>
-           <h1 className="font-bold text-chocolate text-lg">Buntee Admin</h1>
+        <div className="flex items-center gap-3">
+           <div className="w-10 h-10 bg-butter-gold rounded-full flex items-center justify-center text-xl">🐻</div>
+           <h1 className="font-black text-[#4A2410] tracking-tighter">BUNTEE HQ</h1>
         </div>
-        <button onClick={() => signOut(auth)} className="text-gray-400 hover:text-red-500 transition-colors">
-          <LucideLogOut size={24} />
-        </button>
+        <button onClick={() => signOut(auth)} className="p-2 text-gray-400 hover:text-red-500 transition-colors"><LucideLogOut size={24} /></button>
       </header>
 
-      {permissionError && (
-        <div className="bg-red-50 p-4 border-b border-red-100 flex items-center gap-3 text-red-700 text-sm font-medium">
-          <LucideAlertTriangle size={18} />
-          <span>Missing Firestore permissions. Please update your Rules. <a href="#/guide" className="underline font-bold">See Guide</a></span>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <nav className="flex border-b bg-white">
-        <button onClick={() => setActiveTab('settings')} className={`flex-1 p-4 font-bold text-sm flex items-center justify-center gap-2 ${activeTab === 'settings' ? 'text-chocolate border-b-2 border-chocolate' : 'text-gray-400'}`}>
-          <LucideSettings size={18} /> Settings
-        </button>
-        <button onClick={() => setActiveTab('prebookings')} className={`flex-1 p-4 font-bold text-sm flex items-center justify-center gap-2 ${activeTab === 'prebookings' ? 'text-chocolate border-b-2 border-chocolate' : 'text-gray-400'}`}>
-          <LucideClipboardList size={18} /> Pre-Books ({preBookings.length})
-        </button>
-        <button onClick={() => setActiveTab('events')} className={`flex-1 p-4 font-bold text-sm flex items-center justify-center gap-2 ${activeTab === 'events' ? 'text-chocolate border-b-2 border-chocolate' : 'text-gray-400'}`}>
-          <LucideTruck size={18} /> Events ({eventOrders.length})
-        </button>
+      <nav className="flex border-b bg-white overflow-x-auto whitespace-nowrap scrollbar-hide">
+        {[
+          { id: 'settings', label: 'General', icon: LucideSettings },
+          { id: 'menu', label: 'Flavors', icon: LucideUtensils },
+          { id: 'prebookings', label: 'Orders', icon: LucideClipboardList },
+          { id: 'events', label: 'Events', icon: LucideTruck }
+        ].map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)} 
+            className={`flex-1 min-w-[100px] p-5 font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${activeTab === tab.id ? 'text-[#4A2410] border-b-4 border-[#4A2410]' : 'text-gray-400'}`}
+          >
+            <tab.icon size={16} /> {tab.label}
+          </button>
+        ))}
       </nav>
 
-      {/* Content */}
       <main className="flex-1 p-6 overflow-y-auto max-w-4xl mx-auto w-full">
-        {activeTab === 'settings' && (
+        {activeTab === 'menu' && (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <section className="bg-white p-6 rounded-2xl shadow-sm border">
-               <h2 className="font-bold text-chocolate mb-4">Teaser Message</h2>
-               <textarea 
-                  value={settings.teaserText} 
-                  onChange={(e) => setSettings({...settings, teaserText: e.target.value})}
-                  className="w-full border p-4 rounded-xl min-h-[100px] focus:outline-none focus:ring-2 focus:ring-chocolate"
-                  placeholder="Enter what's baking..."
-               ></textarea>
+            <section className="bg-white p-8 rounded-[2rem] shadow-sm border">
+               <h2 className="font-black text-[#4A2410] mb-6 flex items-center gap-2"><LucidePlus size={18} /> Add New Flavor</h2>
+               <form onSubmit={handleAddMenuItem} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <input placeholder="Emoji (🍫)" value={newItem.emoji} onChange={e => setNewItem({...newItem, emoji: e.target.value})} className="border p-4 rounded-2xl" />
+                  <input placeholder="Flavor Name" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="border p-4 rounded-2xl col-span-2" required />
+                  <input placeholder="Price" type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="border p-4 rounded-2xl" required />
+                  <button type="submit" className="md:col-span-4 bg-[#4A2410] text-white p-4 rounded-2xl font-bold">Save Item</button>
+               </form>
             </section>
 
-            <button onClick={handleSaveSettings} className="w-full bg-chocolate text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg">
-               <LucideSave size={20} /> Save Changes
-            </button>
+            <div className="grid grid-cols-1 gap-4">
+               {menuItems.map(item => (
+                 <div key={item.id} className="bg-white p-6 rounded-2xl border flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                       <span className="text-3xl">{item.emoji}</span>
+                       <div>
+                          <p className="font-bold text-[#4A2410]">{item.name}</p>
+                          <p className="text-xs text-gray-400">₹{item.price}</p>
+                       </div>
+                    </div>
+                    <button onClick={() => handleDeleteMenu(item.id)} className="text-red-400 hover:text-red-600 p-2"><LucideTrash2 size={20} /></button>
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+             <div className="bg-white p-8 rounded-[2rem] border shadow-sm">
+                <h3 className="font-bold mb-4 uppercase tracking-widest text-[10px] text-gray-400">Site Config</h3>
+                <textarea 
+                  value={settings.teaserText} 
+                  onChange={e => setSettings({...settings, teaserText: e.target.value})}
+                  className="w-full border p-6 rounded-2xl min-h-[150px] outline-none"
+                  placeholder="The Bun Wisdom for today..."
+                />
+             </div>
+             <button onClick={() => setDoc(doc(db, "adminSettings", "general"), settings)} className="w-full bg-[#4A2410] text-white py-5 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2">
+                <LucideSave size={18} /> Update Content
+             </button>
           </div>
         )}
 
         {activeTab === 'prebookings' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            {preBookings.length === 0 && <p className="text-center py-10 text-gray-400">No pre-bookings yet.</p>}
             {preBookings.map((pb) => (
-              <div key={pb.id} className="bg-white p-6 rounded-2xl shadow-sm border border-chocolate/5">
-                <div className="flex justify-between items-start mb-2">
-                   <h3 className="font-bold text-chocolate">{pb.name}</h3>
-                   <span className="text-[10px] text-gray-400">{pb.timestamp?.toDate().toLocaleString()}</span>
-                </div>
-                <p className="text-sm font-semibold mb-1">{pb.contact}</p>
-                <p className="text-sm text-gray-600 italic bg-gray-50 p-3 rounded-lg border">"{pb.message}"</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'events' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            {eventOrders.length === 0 && <p className="text-center py-10 text-gray-400">No event orders yet.</p>}
-            {eventOrders.map((ev) => (
-              <div key={ev.id} className="bg-white p-6 rounded-2xl shadow-sm border border-chocolate/5">
-                <div className="flex justify-between items-start mb-4">
+              <div key={pb.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border">
+                <div className="flex justify-between items-start mb-6">
                    <div>
-                      <h3 className="font-bold text-chocolate text-lg">{ev.name}</h3>
-                      <p className="text-xs text-butter bg-chocolate px-2 py-0.5 rounded-full inline-block font-bold">{ev.type}</p>
+                      <h3 className="font-black text-xl text-[#4A2410]">{pb.name}</h3>
+                      <p className="font-bold text-butter-gold">{pb.contact}</p>
                    </div>
-                   <span className="text-[10px] text-gray-400">{ev.timestamp?.toDate().toLocaleString()}</span>
+                   <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">{pb.timestamp?.toDate().toLocaleString()}</span>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-xs mb-4">
-                   <div>
-                      <p className="font-bold text-gray-400 uppercase tracking-widest">Contact</p>
-                      <p className="text-chocolate">{ev.contact}</p>
-                   </div>
-                   <div>
-                      <p className="font-bold text-gray-400 uppercase tracking-widest">When</p>
-                      <p className="text-chocolate">{ev.date} @ {ev.time}</p>
-                   </div>
-                   <div className="col-span-2">
-                      <p className="font-bold text-gray-400 uppercase tracking-widest">Address</p>
-                      <p className="text-chocolate">{ev.address}</p>
-                   </div>
-                   <div className="col-span-2">
-                      <p className="font-bold text-gray-400 uppercase tracking-widest">Call Preference</p>
-                      <p className="text-chocolate">{ev.callSchedule ? new Date(ev.callSchedule).toLocaleString() : 'N/A'}</p>
-                   </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <p className="font-bold text-gray-400 uppercase tracking-widest text-[10px] mb-2">Items Ordered</p>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(ev.items || {}).map(([name, qty]: any) => (
-                      <span key={name} className="bg-bun px-3 py-1 rounded-full text-xs text-chocolate font-bold border border-butter/30">
-                        {name}: {qty}
-                      </span>
-                    ))}
-                  </div>
+                <div className="bg-gray-50 p-6 rounded-3xl border border-dashed">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Cart Details</p>
+                  {Object.entries(pb.items || {}).map(([name, qty]: any) => (
+                    <div key={name} className="flex justify-between text-sm font-bold border-b border-gray-100 py-2 last:border-0">
+                      <span>{name}</span>
+                      <span>x{qty}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
