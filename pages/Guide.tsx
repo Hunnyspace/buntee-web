@@ -69,7 +69,7 @@ service cloud.firestore {
             <h2 className="text-xl font-bold">1. Fix Permission Error</h2>
           </div>
           <p className="text-gray-600 text-sm mb-4">
-            If you see <b>"Missing or insufficient permissions"</b>, you MUST copy these rules into your <b>Firebase Console > Firestore > Rules</b> tab:
+            If you see <b>"Missing or insufficient permissions"</b>, you MUST copy these rules into your <b>Firebase Console {' > '} Firestore {' > '} Rules</b> tab:
           </p>
           <CodeBlock id="fb-rules" code={firestoreRules} />
           <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 mt-4 flex gap-3">
@@ -110,7 +110,7 @@ service cloud.firestore {
             <h2 className="text-xl font-bold">2. Build Configuration</h2>
           </div>
           <div className="space-y-4 text-sm text-gray-600">
-             <p>Netlify settings (Site Configuration > Build & Deploy):</p>
+             <p>Netlify settings (Site Configuration {' > '} Build {' & '} Deploy):</p>
              <div className="bg-teal-50 p-4 rounded-2xl border border-teal-200">
                 <ul className="text-xs text-teal-600 space-y-2">
                   <li className="flex justify-between"><span>Build Command:</span> <b>npm run build</b></li>

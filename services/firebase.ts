@@ -1,5 +1,3 @@
-
-// Use standard modular imports for Firebase v9+
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
