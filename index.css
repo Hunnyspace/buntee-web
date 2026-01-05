@@ -7,7 +7,7 @@ html {
   min-height: 100vh;
 }
 
-/* Custom scrollbar for boutique feel */
+/* Custom scrollbar for artisanal feel */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -25,19 +25,21 @@ html {
 .scratch-card-wrapper {
   position: relative;
   width: 100%;
-  max-width: 320px;
+  max-width: 300px; /* Reduced for better mobile fit */
   aspect-ratio: 1 / 1;
   margin: 0 auto;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%234A2410' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a2 2 0 0 1 2.83 0l.3.3a2 2 0 0 1 0 2.83l-3.77 3.77a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a2 2 0 0 1 2.83 2.83l-11 11a5 5 0 0 1-7.1 0 5 5 0 0 1 0-7.1z'%3E%3C/path%3E%3C/svg%3E"), auto;
 }
 
 canvas#scratch-canvas {
   width: 100% !important;
   height: 100% !important;
   touch-action: none;
+  border-radius: 3rem;
 }
 
 /* Input focusing effect */
-input:focus, textarea:focus {
+input:focus, textarea:focus, select:focus {
   transform: translateY(-2px);
   box-shadow: 0 10px 30px -10px rgba(74, 36, 16, 0.15);
   border-color: #FFD700 !important;
@@ -75,9 +77,11 @@ input:focus, textarea:focus {
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-/* Custom Checkbox for Menu */
-.menu-checkbox:checked + label {
-  background: #4A2410;
-  color: white;
-  border-color: #4A2410;
+@keyframes winner-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(255, 215, 0, 0.6); }
+}
+
+.scratch-card-wrapper:has(canvas:not([style*="display: none"])) {
+  /* Only glow when revealing is in progress or completed if logic permits */
 }

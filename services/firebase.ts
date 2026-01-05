@@ -1,9 +1,11 @@
+
 // Fix: Use standard modular imports from Firebase v9+
+// Some environments have issues resolving 'firebase/app', using a more explicit import if needed.
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 // Fix: Always use import {GoogleGenAI} from "@google/genai"; as per strict guidelines
-import {GoogleGenAI} from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 // Firebase configuration using the provided environment variable.
 // The API_KEY is obtained exclusively from the environment variable process.env.API_KEY.
