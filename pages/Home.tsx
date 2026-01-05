@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { db, createAi } from '../services/firebase';
 import { doc, addDoc, collection, onSnapshot } from 'firebase/firestore';
@@ -20,9 +19,16 @@ const Home: React.FC = () => {
 
   // Load Admin Settings
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "adminSettings", "general"), (doc) => {
-      if (doc.exists()) setAdminSettings(doc.data());
-    });
+    // Added error callback to onSnapshot to handle permission-denied gracefully
+    const unsub = onSnapshot(
+      doc(db, "adminSettings", "general"), 
+      (snapshot) => {
+        if (snapshot.exists()) setAdminSettings(snapshot.data());
+      },
+      (error) => {
+        console.warn("Firestore permissions: You might need to update your rules. Check the /guide page.", error);
+      }
+    );
     return () => unsub();
   }, []);
 
@@ -30,8 +36,6 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchBunWisdom = async () => {
       try {
-        // Create a new instance right before the call to ensure the latest API key is used
-        // Using the factory function from our firebase service
         const ai = createAi();
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
@@ -41,8 +45,6 @@ const Home: React.FC = () => {
           },
         });
         
-        // Directly accessing the .text property from GenerateContentResponse as per guidelines
-        // The .text property is a getter, do not call it as a method.
         const wisdomText = response.text;
         if (wisdomText) {
           setBunWisdom(wisdomText.trim());
@@ -68,14 +70,18 @@ const Home: React.FC = () => {
   const handlePreBook = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    await addDoc(collection(db, "preBookings"), {
-      name: formData.get('name'),
-      contact: formData.get('contact'),
-      message: formData.get('message'),
-      timestamp: new Date()
-    });
-    setShowSuccess("Thanks! We’ll reach out to you shortly ❤️");
-    e.currentTarget.reset();
+    try {
+      await addDoc(collection(db, "preBookings"), {
+        name: formData.get('name'),
+        contact: formData.get('contact'),
+        message: formData.get('message'),
+        timestamp: new Date()
+      });
+      setShowSuccess("Thanks! We’ll reach out to you shortly ❤️");
+      e.currentTarget.reset();
+    } catch (err) {
+      alert("Submission failed. Please check your internet or Firebase permissions.");
+    }
   };
 
   const handleEventOrder = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -99,9 +105,13 @@ const Home: React.FC = () => {
       if (val && Number(val) > 0) orderData.items[item] = val;
     });
 
-    await addDoc(collection(db, "eventOrders"), orderData);
-    setShowSuccess("Our sales team will reach you out shortly 📞");
-    e.currentTarget.reset();
+    try {
+      await addDoc(collection(db, "eventOrders"), orderData);
+      setShowSuccess("Our sales team will reach you out shortly 📞");
+      e.currentTarget.reset();
+    } catch (err) {
+      alert("Submission failed. Please check your internet or Firebase permissions.");
+    }
   };
 
   const unlockSpin = () => {

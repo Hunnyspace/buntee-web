@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../services/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, orderBy, onSnapshot, updateDoc } from 'firebase/firestore';
-import { LucideLogOut, LucideSettings, LucideClipboardList, LucideSave, LucideTruck } from 'lucide-react';
+import { doc, getDoc, setDoc, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { LucideLogOut, LucideSettings, LucideClipboardList, LucideSave, LucideTruck, LucideAlertTriangle } from 'lucide-react';
 
 interface AdminProps {
   user: any;
@@ -13,6 +12,7 @@ const Admin: React.FC<AdminProps> = ({ user }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [permissionError, setPermissionError] = useState(false);
   
   const [activeTab, setActiveTab] = useState<'settings' | 'prebookings' | 'events'>('settings');
   const [settings, setSettings] = useState<any>({ teaserText: "" });
@@ -24,18 +24,35 @@ const Admin: React.FC<AdminProps> = ({ user }) => {
 
     // Load settings
     const loadSettings = async () => {
-      const docRef = doc(db, "adminSettings", "general");
-      const d = await getDoc(docRef);
-      if (d.exists()) setSettings(d.data());
+      try {
+        const docRef = doc(db, "adminSettings", "general");
+        const d = await getDoc(docRef);
+        if (d.exists()) setSettings(d.data());
+      } catch (err) {
+        console.error("Settings load error:", err);
+        setPermissionError(true);
+      }
     };
     loadSettings();
 
-    // Listen to data
+    // Listen to data with error handlers
     const qPre = query(collection(db, "preBookings"), orderBy("timestamp", "desc"));
-    const unsubPre = onSnapshot(qPre, (snap) => setPreBookings(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubPre = onSnapshot(qPre, 
+      (snap) => setPreBookings(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      (err) => {
+        console.error("PreBookings listener error:", err);
+        setPermissionError(true);
+      }
+    );
 
     const qEvent = query(collection(db, "eventOrders"), orderBy("timestamp", "desc"));
-    const unsubEvent = onSnapshot(qEvent, (snap) => setEventOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubEvent = onSnapshot(qEvent, 
+      (snap) => setEventOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      (err) => {
+        console.error("EventOrders listener error:", err);
+        setPermissionError(true);
+      }
+    );
 
     return () => {
       unsubPre();
@@ -53,8 +70,12 @@ const Admin: React.FC<AdminProps> = ({ user }) => {
   };
 
   const handleSaveSettings = async () => {
-    await setDoc(doc(db, "adminSettings", "general"), settings);
-    alert("Settings saved!");
+    try {
+      await setDoc(doc(db, "adminSettings", "general"), settings);
+      alert("Settings saved!");
+    } catch (err) {
+      alert("Failed to save. Check your Firebase Rules.");
+    }
   };
 
   if (!user) {
@@ -85,6 +106,13 @@ const Admin: React.FC<AdminProps> = ({ user }) => {
           <LucideLogOut size={24} />
         </button>
       </header>
+
+      {permissionError && (
+        <div className="bg-red-50 p-4 border-b border-red-100 flex items-center gap-3 text-red-700 text-sm font-medium">
+          <LucideAlertTriangle size={18} />
+          <span>Missing Firestore permissions. Please update your Rules. <a href="#/guide" className="underline font-bold">See Guide</a></span>
+        </div>
+      )}
 
       {/* Tabs */}
       <nav className="flex border-b bg-white">
@@ -163,7 +191,7 @@ const Admin: React.FC<AdminProps> = ({ user }) => {
                    </div>
                    <div className="col-span-2">
                       <p className="font-bold text-gray-400 uppercase tracking-widest">Call Preference</p>
-                      <p className="text-chocolate">{new Date(ev.callSchedule).toLocaleString()}</p>
+                      <p className="text-chocolate">{ev.callSchedule ? new Date(ev.callSchedule).toLocaleString() : 'N/A'}</p>
                    </div>
                 </div>
 
