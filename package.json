@@ -4,7 +4,7 @@
   "description": "Buntee Bun Maska Stall Official Website",
   "scripts": {
     "start": "npx serve .",
-    "build": "echo 'Static site ready'"
+    "build": "echo 'Building static site...'"
   },
   "keywords": [],
   "author": "Buntee",
